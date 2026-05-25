@@ -30,50 +30,47 @@ Formato exato:
 [Cole aqui a partitura ou anexe a imagem/PDF]`
 
 export function ImportButton({ onImport }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const xmlInputRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
+  const [showJsonPanel, setShowJsonPanel] = useState(false)
+  const [jsonText, setJsonText] = useState('')
   const [copied, setCopied] = useState(false)
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!inputRef.current) return
-    inputRef.current.value = ''
-    if (!file) return
+  function importJson(text: string) {
+    const exercise = parseJsonExercise(text)
+    if (!exercise) {
+      setStatus('error')
+      setMessage('JSON inválido. Verifique o formato.')
+      return
+    }
+    onImport(exercise)
+    setStatus('ok')
+    setMessage(`"${exercise.title}" — ${exercise.notes.length} notas importadas`)
+    setShowJsonPanel(false)
+    setJsonText('')
+  }
 
-    const isJson = file.name.endsWith('.json')
+  function handleXmlFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!xmlInputRef.current) return
+    xmlInputRef.current.value = ''
+    if (!file) return
 
     const reader = new FileReader()
     reader.onload = () => {
-      const text = reader.result as string
-
-      if (isJson) {
-        const exercise = parseJsonExercise(text)
-        if (!exercise) {
-          setStatus('error')
-          setMessage('JSON inválido. Verifique o formato.')
-          return
-        }
-        onImport(exercise)
-        setStatus('ok')
-        setMessage(`"${exercise.title}" — ${exercise.notes.length} notas importadas`)
-      } else {
-        const result = parseMusicXml(text)
-        if (!result) {
-          setStatus('error')
-          setMessage('MusicXML inválido ou sem notas reconhecidas.')
-          return
-        }
-        onImport(result.exercise)
-        setStatus('ok')
-        setMessage(`"${result.exercise.title}" — ${result.totalNotes} notas importadas`)
+      const result = parseMusicXml(reader.result as string)
+      if (!result) {
+        setStatus('error')
+        setMessage('MusicXML inválido ou sem notas reconhecidas.')
+        return
       }
+      onImport(result.exercise)
+      setStatus('ok')
+      setMessage(`"${result.exercise.title}" — ${result.totalNotes} notas importadas`)
     }
-    reader.onerror = () => {
-      setStatus('error')
-      setMessage('Erro ao ler o arquivo.')
-    }
+    reader.onerror = () => { setStatus('error'); setMessage('Erro ao ler o arquivo.') }
     reader.readAsText(file)
   }
 
@@ -88,28 +85,56 @@ export function ImportButton({ onImport }: Props) {
     <div className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
         <button
-          onClick={() => inputRef.current?.click()}
-          className="flex items-center gap-2 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded-lg text-sm transition-colors"
+          onClick={() => { setShowJsonPanel(p => !p); setStatus('idle') }}
+          className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded-lg text-sm transition-colors"
         >
-          ↑ Importar partitura
+          ↑ Colar JSON
         </button>
-        <span className="text-xs text-gray-500">.musicxml ou .json</span>
+        <button
+          onClick={() => xmlInputRef.current?.click()}
+          className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm transition-colors"
+        >
+          ↑ MusicXML
+        </button>
         <button
           onClick={() => setShowPrompt(p => !p)}
           className="text-xs text-indigo-400 hover:text-indigo-300 underline"
         >
           {showPrompt ? 'Fechar' : 'Como converter com IA?'}
         </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".musicxml,.xml,.json"
-          className="hidden"
-          onChange={handleFile}
-        />
+        <input ref={xmlInputRef} type="file" accept=".musicxml,.xml" className="hidden" onChange={handleXmlFile} />
         {status === 'ok' && <span className="text-xs text-green-400">{message}</span>}
         {status === 'error' && <span className="text-xs text-red-400">{message}</span>}
       </div>
+
+      {showJsonPanel && (
+        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 space-y-2">
+          <p className="text-xs text-gray-400">Cole o JSON gerado pela IA:</p>
+          <textarea
+            autoFocus
+            value={jsonText}
+            onChange={e => setJsonText(e.target.value)}
+            placeholder={'{\n  "title": "Minha Música",\n  "bpm": 80,\n  "timeSignature": [4, 4],\n  "notes": [\n    { "pitch": "C4", "duration": "q" }\n  ]\n}'}
+            className="w-full h-48 bg-gray-900 text-gray-200 text-xs font-mono rounded p-2 border border-gray-700 focus:border-indigo-500 focus:outline-none resize-y"
+            spellCheck={false}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => importJson(jsonText)}
+              disabled={!jsonText.trim()}
+              className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white rounded-lg text-sm transition-colors"
+            >
+              Importar
+            </button>
+            <button
+              onClick={() => { setShowJsonPanel(false); setJsonText(''); setStatus('idle') }}
+              className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {showPrompt && (
         <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 space-y-2">
@@ -125,9 +150,6 @@ export function ImportButton({ onImport }: Props) {
           >
             {copied ? '✓ Copiado!' : 'Copiar prompt'}
           </button>
-          <p className="text-xs text-gray-500">
-            Salve a resposta como <code className="text-gray-400">musica.json</code> e importe acima.
-          </p>
         </div>
       )}
     </div>
