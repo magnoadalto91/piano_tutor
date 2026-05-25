@@ -85,6 +85,15 @@ export default function App() {
     resetExercise()
   }
 
+  function deleteImported(id: string) {
+    setImportedExercises(prev => {
+      const updated = prev.filter(e => e.id !== id)
+      saveImported(updated)
+      return updated
+    })
+    if (selectedId === id) selectExercise(builtinExercises[0].id)
+  }
+
   function handleImport(exercise: Exercise) {
     setImportedExercises(prev => {
       const updated = [...prev.filter(e => e.id !== exercise.id), exercise]
@@ -156,15 +165,23 @@ export default function App() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-gray-500 uppercase tracking-wide">Importados</span>
                   {importedExercises.map(ex => (
-                    <button
-                      key={ex.id}
-                      onClick={() => selectExercise(ex.id)}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        selectedId === ex.id ? 'bg-indigo-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                      }`}
-                    >
-                      {ex.title}
-                    </button>
+                    <div key={ex.id} className="flex items-center">
+                      <button
+                        onClick={() => selectExercise(ex.id)}
+                        className={`px-3 py-1.5 rounded-l-lg text-sm transition-colors ${
+                          selectedId === ex.id ? 'bg-indigo-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                        }`}
+                      >
+                        {ex.title}
+                      </button>
+                      <button
+                        onClick={() => deleteImported(ex.id)}
+                        title="Remover"
+                        className="px-2 py-1.5 rounded-r-lg text-sm bg-gray-800 text-gray-600 hover:bg-red-900 hover:text-red-400 transition-colors border-l border-gray-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
