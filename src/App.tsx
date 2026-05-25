@@ -13,10 +13,24 @@ import type { MidiNote } from './hooks/useMidi'
 type Tab = 'praticar' | 'figuras' | 'metronomo'
 
 const PAGE_SIZE = 8
+const STORAGE_KEY = 'piano-tutor-imported'
+
+function loadImported(): Exercise[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as Exercise[]
+  } catch {
+    return []
+  }
+}
+
+function saveImported(exercises: Exercise[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(exercises))
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('praticar')
-  const [allExercises, setAllExercises] = useState<Exercise[]>(builtinExercises)
+  const [importedExercises, setImportedExercises] = useState<Exercise[]>(loadImported)
+  const allExercises = [...builtinExercises, ...importedExercises]
   const [selectedId, setSelectedId] = useState(builtinExercises[0].id)
   const [activeNoteIndex, setActiveNoteIndex] = useState<number | null>(0)
   const [correctNotes, setCorrectNotes] = useState<Set<number>>(new Set())
@@ -72,9 +86,10 @@ export default function App() {
   }
 
   function handleImport(exercise: Exercise) {
-    setAllExercises(prev => {
-      const filtered = prev.filter(e => e.id !== exercise.id)
-      return [...filtered, exercise]
+    setImportedExercises(prev => {
+      const updated = [...prev.filter(e => e.id !== exercise.id), exercise]
+      saveImported(updated)
+      return updated
     })
     selectExercise(exercise.id)
     setTab('praticar')
@@ -95,8 +110,6 @@ export default function App() {
 
   const highlightNote = mode === 'practice' ? currentNote?.midi ?? null : null
   const finished = mode === 'practice' && activeNoteIndex === null
-  const builtinIds = new Set(builtinExercises.map(e => e.id))
-  const importedExercises = allExercises.filter(e => !builtinIds.has(e.id))
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
